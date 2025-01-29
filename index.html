@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MATRIX HOLO</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/dist/tween.umd.js"></script>
+    
+    <script>
+        // 初始化场景
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // 生成数据流粒子
+        const particles = new THREE.BufferGeometry();
+        const count = 5000;
+        const posArray = new Float32Array(count * 3);
+        for(let i=0; i<count*3; i++) 
+            posArray[i] = (Math.random() - 0.5) * 10;
+        particles.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        
+        const material = new THREE.PointsMaterial({
+            size: 0.02,
+            color: 0x00ff00,
+            transparent: true,
+            opacity: 0.8
+        });
+        const particleMesh = new THREE.Points(particles, material);
+        scene.add(particleMesh);
+
+        // 添加旋转环
+        const ringGeo = new THREE.TorusGeometry(3, 0.02, 16, 100);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        scene.add(ring);
+
+        // 音频可视化
+        const analyser = new THREE.AudioAnalyser(new THREE.AudioListener(), 64);
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => analyser.analyser.getByteFrequencyData(stream));
+
+        camera.position.z = 8;
+
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // 粒子动态
+            const positions = particleMesh.geometry.attributes.position.array;
+            for(let i=0; i<count; i++) {
+                positions[i*3+1] -= 0.03;
+                if(positions[i*3+1] < -5) positions[i*3+1] = 5;
+            }
+            particleMesh.geometry.attributes.position.needsUpdate = true;
+
+            // 环的脉冲
+            const scale = 1 + Math.sin(Date.now()*0.005)*0.2;
+            ring.scale.set(scale, scale, scale);
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // 窗口自适应
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
