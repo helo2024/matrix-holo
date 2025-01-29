@@ -8,18 +8,26 @@
     </style>
 </head>
 <body>
+    <!-- 使用最新版Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/dist/tween.umd.js"></script>
     
     <script>
-        // 初始化场景
+        // 初始化检查
+        if (!WebGLRenderingContext){
+            alert("请使用支持WebGL的浏览器（推荐Chrome/Firefox）");
+        }
+
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const renderer = new THREE.WebGLRenderer({ 
+            antialias: true,
+            alpha: true // 允许透明背景
+        });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 0); // 全透明背景
         document.body.appendChild(renderer.domElement);
 
-        // 生成数据流粒子
+        // 增强粒子参数
         const particles = new THREE.BufferGeometry();
         const count = 5000;
         const posArray = new Float32Array(count * 3);
@@ -28,42 +36,63 @@
         particles.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
         
         const material = new THREE.PointsMaterial({
-            size: 0.02,
-            color: 0x00ff00,
+            size: 0.05,  // 增大粒子尺寸
+            color: 0x00FF00,
             transparent: true,
-            opacity: 0.8
+            opacity: 1,  // 取消透明度
+            blending: THREE.AdditiveBlending
         });
         const particleMesh = new THREE.Points(particles, material);
         scene.add(particleMesh);
 
-        // 添加旋转环
-        const ringGeo = new THREE.TorusGeometry(3, 0.02, 16, 100);
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        // 调整环参数
+        const ringGeo = new THREE.TorusGeometry(3, 0.1, 16, 100); // 增加环厚度
+        const ringMat = new THREE.MeshBasicMaterial({ 
+            color: 0x00FF00,
+            wireframe: true // 线框模式更明显
+        });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         scene.add(ring);
 
-        // 音频可视化
-        const analyser = new THREE.AudioAnalyser(new THREE.AudioListener(), 64);
-        navigator.mediaDevices.getUserMedia({ audio: true })
-            .then(stream => analyser.analyser.getByteFrequencyData(stream));
+        // 安全访问音频设备
+        let audioEnabled = false;
+        const initAudio = () => {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    audioEnabled = true;
+                    const audioContext = new AudioContext();
+                    const analyser = audioContext.createAnalyser();
+                    const microphone = audioContext.createMediaStreamSource(stream);
+                    microphone.connect(analyser);
+                })
+                .catch(err => {
+                    console.log('麦克风访问被拒绝，继续运行基础模式');
+                });
+        }
+        initAudio();
 
-        camera.position.z = 8;
+        camera.position.z = 5;  // 调整相机距离
 
-        // 动画循环
+        // 强化动画循环
         function animate() {
             requestAnimationFrame(animate);
             
             // 粒子动态
             const positions = particleMesh.geometry.attributes.position.array;
             for(let i=0; i<count; i++) {
-                positions[i*3+1] -= 0.03;
+                positions[i*3+1] -= 0.05;  // 加快下落速度
                 if(positions[i*3+1] < -5) positions[i*3+1] = 5;
+                positions[i*3+0] += Math.sin(Date.now()*0.001 + i)*0.01; // 添加横向波动
             }
             particleMesh.geometry.attributes.position.needsUpdate = true;
 
-            // 环的脉冲
-            const scale = 1 + Math.sin(Date.now()*0.005)*0.2;
-            ring.scale.set(scale, scale, scale);
+            // 环动态
+            ring.rotation.x += 0.01;
+            ring.rotation.y += 0.005;
+            if(audioEnabled){
+                const scale = 1 + Math.sin(Date.now()*0.005)*0.5; // 增强脉冲幅度
+                ring.scale.set(scale, scale, scale);
+            }
 
             renderer.render(scene, camera);
         }
@@ -75,6 +104,10 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
+
+        // 初始旋转
+        camera.position.y = 2;  // 调整视角高度
+        camera.lookAt(0, 0, 0);
     </script>
 </body>
 </html>
